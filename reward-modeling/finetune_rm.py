@@ -2,10 +2,12 @@ import os
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, random_split
-from transformers import AutoTokenizer, TrainingArguments, Trainer, AutoModelForCausalLM, IntervalStrategy, AutoModel, AutoConfig, PreTrainedModel, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, TrainingArguments, Trainer, AutoModelForCausalLM, IntervalStrategy, AutoModel, \
+    AutoConfig, PreTrainedModel, AutoModelForSequenceClassification
 import json
 import deepspeed
-from rm_datasets import PairwiseDataset, PairwiseEvalDataset, pairwise_data_collator, ranked_data_collator, RankedDataset, RankedEvalDataset
+from rm_datasets import PairwiseDataset, PairwiseEvalDataset, pairwise_data_collator, ranked_data_collator, \
+    RankedDataset, RankedEvalDataset
 import argparse
 from utils import freeze_bottom_causal_layers, load_yaml, make_rm
 from datasets import load_dataset
@@ -31,7 +33,7 @@ class RankedTrainer(Trainer):
         rewards = model(**inputs)
         loss = 0
         for i in range(rewards.shape[0]):
-            for j in range(i+1, rewards.shape[0]):
+            for j in range(i + 1, rewards.shape[0]):
                 loss += -torch.log(torch.sigmoid(rewards[i] - rewards[j]))
         loss = loss[0] / (rewards.shape[0] * (rewards.shape[0] - 1) / 2)
         return (loss, rewards) if return_outputs else loss
@@ -49,7 +51,7 @@ class PairwiseTrainer(Trainer):
         chosen_rewards = rewards[:bs]
         rejected_rewards = rewards[bs:]
         loss = -torch.log(torch.sigmoid(chosen_rewards - rejected_rewards)).mean()
-        return (loss, outputs) if return_outputs else loss
+        return (loss, rewards) if return_outputs else loss
 
 
 def compute_metrics(eval_preds):
@@ -80,27 +82,31 @@ def train(config):
         split = data["train"].train_test_split(test_size=0.05)
         train_data = split["train"]
         eval_data = split["test"]
-    
+
     if config["trainer_type"] == "ranked":
         order = config["order"]
-        train_dataset = RankedDataset(train_data, tokenizer, max_length=max_length, order=order, max_num=config["max_train_size"])
-        eval_dataset = RankedEvalDataset(eval_data, tokenizer, max_length=max_length, order=order, max_num=config["max_train_size"])
+        train_dataset = RankedDataset(train_data, tokenizer, max_length=max_length, order=order,
+                                      max_num=config["max_train_size"])
+        eval_dataset = RankedEvalDataset(eval_data, tokenizer, max_length=max_length, order=order,
+                                         max_num=config["max_train_size"])
     else:
         train_dataset = PairwiseDataset(train_data, tokenizer, max_length=max_length, max_num=config["max_train_size"])
         eval_dataset = PairwiseEvalDataset(eval_data, tokenizer, max_length=max_length)
 
     training_args = TrainingArguments(**config["train_args"])
     if config["trainer_type"] == "sparse":
-        trainer = SparsePairwiseTrainer(model=model, args=training_args, train_dataset=train_dataset, compute_metrics=compute_metrics,
-             eval_dataset=eval_dataset, data_collator=pairwise_data_collator)
+        trainer = SparsePairwiseTrainer(model=model, args=training_args, train_dataset=train_dataset,
+                                        compute_metrics=compute_metrics,
+                                        eval_dataset=eval_dataset, data_collator=pairwise_data_collator)
     elif config["trainer_type"] == "dense":
         trainer = DensePairwiseTrainer(model=model, args=training_args, train_dataset=train_dataset,
-            data_collator=pairwise_data_collator)
+                                       data_collator=pairwise_data_collator)
     elif config["trainer_type"] == "ranked":
-        trainer = RankedTrainer(model=model, args=training_args, train_dataset=train_dataset, data_collator=ranked_data_collator)
+        trainer = RankedTrainer(model=model, args=training_args, train_dataset=train_dataset, eval_dataset=eval_dataset,
+                                data_collator=ranked_data_collator)
     else:
         trainer = PairwiseTrainer(model=model, args=training_args, train_dataset=train_dataset,
-             data_collator=pairwise_data_collator)
+                                  data_collator=pairwise_data_collator)
     trainer.train()
 
     # NOTE: In order to run this install transformers from source
@@ -123,7 +129,7 @@ def train(config):
         accs = {}
         convert = {i: m for i, m in enumerate(order)}
         for i in range(num_ranks):
-            for j in range(i+1, num_ranks):
+            for j in range(i + 1, num_ranks):
                 diff = preds[:, i] - preds[:, j]
                 local_acc = (diff >= 0).type(torch.float32).sum().item()
                 acc += local_acc
@@ -151,7 +157,7 @@ def train(config):
         if torch.distributed.get_rank() == 0:
             wandb.log({"samples": wandb.Table(data=pd.DataFrame(samples))})
             wandb.log({"acc": acc})
-        
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
