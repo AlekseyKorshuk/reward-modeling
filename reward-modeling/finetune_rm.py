@@ -14,6 +14,8 @@ from datasets import load_dataset
 import wandb
 import random
 
+trainer = None
+
 
 class SparsePairwiseTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False):
@@ -103,6 +105,7 @@ class RankedCallback(TrainerCallback):
 
 
 def train(config):
+    global trainer
     tokenizer = AutoTokenizer.from_pretrained(config["tokenizer_path"])
     tokenizer.pad_token = tokenizer.eos_token
     training_args = TrainingArguments(**config["train_args"])
