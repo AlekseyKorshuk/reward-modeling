@@ -3,7 +3,7 @@ tokenizer_path: "gpt2"
 num_layers_unfrozen: 0.67
 
 train_args:
-  output_dir: "/fsx/alex/ckpts/gpt2xl-rm"
+  output_dir: "temp/gpt2xl-rm"
   num_train_epochs: 1
   logging_steps: 100
   save_strategy: "epoch"
@@ -17,5 +17,6 @@ train_args:
   fp16: False
   bf16: True
 
-data_path: "Dahoas/rm-static"
-trainer_type: "default"
+data_path: "AlekseyKorshuk/cup-it-ds-ranked-test"
+trainer_type: "ranked"
+order: [ "0", "1", "2", "3", "4" ]
