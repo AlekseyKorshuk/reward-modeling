@@ -94,14 +94,20 @@ class PairwiseDataset(Dataset):
                 break
             prompt = pair["prompt"]
             chosen, rejected = pair["chosen"], pair["rejected"]
-            tok_chosen = tokenizer(prompt + chosen + "<|endoftext|>", return_tensors="pt")["input_ids"]
-            tok_rejected = tokenizer(prompt + rejected + "<|endoftext|>", return_tensors="pt")["input_ids"]
+            tok_chosen = \
+                tokenizer("<|endoftext|>" + prompt + "<|endoftext|>" + chosen + "<|endoftext|>", return_tensors="pt")[
+                    "input_ids"]
+            tok_rejected = \
+                tokenizer("<|endoftext|>" + prompt + "<|endoftext|>" + rejected + "<|endoftext|>", return_tensors="pt")[
+                    "input_ids"]
             # Reject data with num tokens > max_length
             if tok_chosen.shape[-1] <= max_length and tok_rejected.shape[-1] <= max_length and chosen != rejected:
-                chosen_encodings_dict = tokenizer(prompt + chosen + '<|endoftext|>', truncation=True,
+                chosen_encodings_dict = tokenizer("<|endoftext|>" + prompt + "<|endoftext|>" + chosen + "<|endoftext|>",
+                                                  truncation=True,
                                                   max_length=max_length, padding="max_length", return_tensors="pt")
-                rejected_encodings_dict = tokenizer(prompt + rejected + '<|endoftext|>', truncation=True,
-                                                    max_length=max_length, padding="max_length", return_tensors="pt")
+                rejected_encodings_dict = tokenizer(
+                    "<|endoftext|>" + prompt + "<|endoftext|>" + rejected + "<|endoftext|>", truncation=True,
+                    max_length=max_length, padding="max_length", return_tensors="pt")
                 self.chosen_input_ids.append(chosen_encodings_dict['input_ids'])
                 self.chosen_attn_masks.append(chosen_encodings_dict['attention_mask'])
                 self.rejected_input_ids.append(rejected_encodings_dict['input_ids'])
@@ -123,14 +129,20 @@ class PairwiseEvalDataset(Dataset):
         for pair in tqdm(pairs):
             prompt = pair["prompt"]
             chosen, rejected = pair["chosen"], pair["rejected"]
-            tok_chosen = tokenizer(prompt + chosen + "<|endoftext|>", return_tensors="pt")["input_ids"]
-            tok_rejected = tokenizer(prompt + rejected + "<|endoftext|>", return_tensors="pt")["input_ids"]
+            tok_chosen = \
+            tokenizer("<|endoftext|>" + prompt + "<|endoftext|>" + chosen + "<|endoftext|>", return_tensors="pt")[
+                "input_ids"]
+            tok_rejected = \
+            tokenizer("<|endoftext|>" + prompt + "<|endoftext|>" + rejected + "<|endoftext|>", return_tensors="pt")[
+                "input_ids"]
             # Reject data with num tokens > max_length
             if tok_chosen.shape[-1] <= max_length and tok_rejected.shape[-1] <= max_length:
-                chosen_encodings_dict = tokenizer(prompt + chosen + '<|endoftext|>', truncation=True,
+                chosen_encodings_dict = tokenizer("<|endoftext|>" + prompt + "<|endoftext|>" + chosen + "<|endoftext|>",
+                                                  truncation=True,
                                                   max_length=max_length, padding="max_length", return_tensors="pt")
-                rejected_encodings_dict = tokenizer(prompt + rejected + '<|endoftext|>', truncation=True,
-                                                    max_length=max_length, padding="max_length", return_tensors="pt")
+                rejected_encodings_dict = tokenizer(
+                    "<|endoftext|>" + prompt + "<|endoftext|>" + rejected + "<|endoftext|>", truncation=True,
+                    max_length=max_length, padding="max_length", return_tensors="pt")
                 # First append chosen then rejected
                 self.input_ids.append(chosen_encodings_dict['input_ids'])
                 self.attn_masks.append(chosen_encodings_dict['attention_mask'])
