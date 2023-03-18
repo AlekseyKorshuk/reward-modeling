@@ -1,10 +1,10 @@
-model_path: "Dahoas/gpt2-sft-static"
+model_path: "gpt2"
 model_type: "causal"
 tokenizer_path: "gpt2"
 num_layers_unfrozen: 0.75
 
 train_args:
-  output_dir: "/fsx/alex/ckpts/gpt2-rm"
+  output_dir: "/tmp/gpt2-test"
   num_train_epochs: 1
   logging_steps: 100
   eval_steps: 100
@@ -20,5 +20,5 @@ train_args:
   fp16: True
   bf16: False
 
-data_path: "Dahoas/rm-static"
-trainer_type: "sparse"
+data_path: "AlekseyKorshuk/cup-it-ds-ranked"
+trainer_type: "ranked"
