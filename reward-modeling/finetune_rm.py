@@ -111,6 +111,7 @@ class PairwiseCallback(TrainerCallback):
         self.eval_data = eval_data
 
     def on_evaluate(self, args, state, control, **kwargs):
+        print("pairwise on _evaluate")
         global trainer
         preds = torch.tensor(trainer.predict(self.eval_dataset)[0])
         preds = preds.view(-1, 2)
