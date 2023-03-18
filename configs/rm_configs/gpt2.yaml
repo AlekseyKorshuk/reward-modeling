@@ -20,6 +20,6 @@ train_args:
   fp16: True
   bf16: False
 
-data_path: "AlekseyKorshuk/cup-it-ds-ranked-test"
+data_path: "AlekseyKorshuk/cup-it-ds-ranked"
 trainer_type: "ranked"
 order: [ "0", "1", "2", "3", "4" ]
