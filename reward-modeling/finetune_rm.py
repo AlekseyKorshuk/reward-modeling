@@ -164,9 +164,13 @@ def train(config):
     training_args = TrainingArguments(**config["train_args"])
 
     if config["trainer_type"] == "sparse":
+        callbacks = [
+            PairwiseCallback(eval_dataset, eval_data)
+        ]
         trainer = SparsePairwiseTrainer(model=model, args=training_args, train_dataset=train_dataset,
                                         compute_metrics=compute_metrics,
-                                        eval_dataset=eval_dataset, data_collator=pairwise_data_collator)
+                                        eval_dataset=eval_dataset, data_collator=pairwise_data_collator,
+                                        callbacks=callbacks)
     elif config["trainer_type"] == "dense":
         trainer = DensePairwiseTrainer(model=model, args=training_args, train_dataset=train_dataset,
                                        data_collator=pairwise_data_collator)
