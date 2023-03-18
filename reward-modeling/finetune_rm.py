@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, random_split
 from transformers import AutoTokenizer, TrainingArguments, Trainer, AutoModelForCausalLM, IntervalStrategy, AutoModel, \
-    AutoConfig, PreTrainedModel, AutoModelForSequenceClassification
+    AutoConfig, PreTrainedModel, AutoModelForSequenceClassification, TrainerCallback
 import json
 import deepspeed
 from rm_datasets import PairwiseDataset, PairwiseEvalDataset, pairwise_data_collator, ranked_data_collator, \
@@ -63,6 +63,45 @@ def compute_metrics(eval_preds):
     return {"accuracy": acc}
 
 
+class RankedCallback(TrainerCallback):
+
+    def __init__(self, eval_dataset, order, eval_data):
+        self.eval_dataset = eval_dataset
+        self.order = order
+        self.eval_data = eval_data
+
+    def on_evaluate(self, args, state, control, **kwargs):
+        num_ranks = len(self.order)
+        global trainer
+        preds = torch.tensor(trainer.predict(self.eval_dataset)[0])
+        preds = preds.view(-1, num_ranks)
+        samples = {m: [] for m in self.order}
+        samples["prompt"] = []
+        samples["scores"] = []
+        for i in range(16):
+            ele = self.eval_data[i]
+            for m in self.order:
+                samples[m].append(ele[m])
+            samples["prompt"].append(ele["prompt"])
+            samples["scores"].append(preds[i].tolist())
+        # Subtracting rejected scores from chosen scores
+        acc = 0
+        accs = {}
+        convert = {i: m for i, m in enumerate(self.order)}
+        for i in range(num_ranks):
+            for j in range(i + 1, num_ranks):
+                diff = preds[:, i] - preds[:, j]
+                local_acc = (diff >= 0).type(torch.float32).sum().item()
+                acc += local_acc
+                accs[convert[i] + "-" + convert[j]] = local_acc / diff.shape[0]
+        acc = acc / (preds.shape[0] * (num_ranks * (num_ranks - 1)) / 2)
+        accs["total_acc"] = acc
+        print("Testing accuracy: ", acc)
+        if torch.distributed.get_rank() == 0:
+            wandb.log({"samples": wandb.Table(data=pd.DataFrame(samples))})
+            wandb.log(accs)
+
+
 def train(config):
     tokenizer = AutoTokenizer.from_pretrained(config["tokenizer_path"])
     tokenizer.pad_token = tokenizer.eos_token
@@ -94,6 +133,7 @@ def train(config):
         eval_dataset = PairwiseEvalDataset(eval_data, tokenizer, max_length=max_length)
 
     training_args = TrainingArguments(**config["train_args"])
+
     if config["trainer_type"] == "sparse":
         trainer = SparsePairwiseTrainer(model=model, args=training_args, train_dataset=train_dataset,
                                         compute_metrics=compute_metrics,
@@ -102,8 +142,11 @@ def train(config):
         trainer = DensePairwiseTrainer(model=model, args=training_args, train_dataset=train_dataset,
                                        data_collator=pairwise_data_collator)
     elif config["trainer_type"] == "ranked":
+        callbacks = [
+            RankedCallback(eval_dataset, order, eval_data)
+        ]
         trainer = RankedTrainer(model=model, args=training_args, train_dataset=train_dataset, eval_dataset=eval_dataset,
-                                data_collator=ranked_data_collator)
+                                data_collator=ranked_data_collator, callbacks=callbacks)
     else:
         trainer = PairwiseTrainer(model=model, args=training_args, train_dataset=train_dataset,
                                   data_collator=pairwise_data_collator)
