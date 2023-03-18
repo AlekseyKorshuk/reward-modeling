@@ -19,6 +19,6 @@ train_args:
   fp16: True
   bf16: False
 
-data_path: "AlekseyKorshuk/cup-it-ds-ranked-small"
-trainer_type: "ranked"
+data_path: "AlekseyKorshuk/cup-it-ds-pairwise-small"
+trainer_type: "default"
 order: [ "0", "1", "2", "3", "4" ]
