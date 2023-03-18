@@ -104,6 +104,32 @@ class RankedCallback(TrainerCallback):
             wandb.log(accs)
 
 
+class PairwiseCallback(TrainerCallback):
+
+    def __init__(self, eval_dataset, eval_data):
+        self.eval_dataset = eval_dataset
+        self.eval_data = eval_data
+
+    def on_evaluate(self, args, state, control, **kwargs):
+        global trainer
+        preds = torch.tensor(trainer.predict(self.eval_dataset)[0])
+        preds = preds.view(-1, 2)
+        samples = {"prompt": [], "chosen": [], "rejected": [], "scores": []}
+        for i in range(16):
+            ele = self.eval_data[i]
+            samples["prompt"].append(ele["prompt"])
+            samples["chosen"].append(ele["chosen"])
+            samples["rejected"].append(ele["rejected"])
+            samples["scores"].append(preds[i].tolist())
+        # Subtracting rejected scores from chosen scores
+        diff = preds[:, 0] - preds[:, 1]
+        acc = (diff >= 0).type(torch.float32).mean().item()
+        print("Testing accuracy: ", acc)
+        if torch.distributed.get_rank() == 0:
+            wandb.log({"samples": wandb.Table(data=pd.DataFrame(samples))})
+            wandb.log({"acc": acc})
+
+
 def train(config):
     global trainer
     tokenizer = AutoTokenizer.from_pretrained(config["tokenizer_path"])
@@ -151,8 +177,11 @@ def train(config):
         trainer = RankedTrainer(model=model, args=training_args, train_dataset=train_dataset, eval_dataset=eval_dataset,
                                 data_collator=ranked_data_collator, callbacks=callbacks)
     else:
+        callbacks = [
+            PairwiseCallback(eval_dataset, eval_data)
+        ]
         trainer = PairwiseTrainer(model=model, args=training_args, train_dataset=train_dataset,
-                                  data_collator=pairwise_data_collator)
+                                  data_collator=pairwise_data_collator, callbacks=callbacks)
     trainer.train()
 
     # NOTE: In order to run this install transformers from source
