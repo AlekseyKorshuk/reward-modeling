@@ -6,7 +6,7 @@ num_layers_unfrozen: 0.75
 train_args:
   output_dir: "/tmp/gpt2-test"
   num_train_epochs: 1
-  logging_steps: 100
+  logging_steps: 10
   eval_steps: 10
   evaluation_strategy: "steps"
   save_strategy: "epoch"
