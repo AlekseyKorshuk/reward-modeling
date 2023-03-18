@@ -22,3 +22,4 @@ train_args:
 
 data_path: "AlekseyKorshuk/cup-it-ds-ranked"
 trainer_type: "ranked"
+order: [ "0", "1", "2", "3", "4" ]
